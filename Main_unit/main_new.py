@@ -79,18 +79,25 @@ class VideoFrameWidget(QLabel):
     deleteRequested = pyqtSignal(QWidget)
     streamStateChanged = pyqtSignal(bool, str)  # Signal for stream state change (on/off)
 
-    def __init__(self, url, parent=None):
+    def __init__(self, url, screen_name, screen_number, parent=None):
         super(VideoFrameWidget, self).__init__(parent)
         self.setFixedSize(400, 400)
         self.setAlignment(Qt.AlignCenter)
         self.active = False  # Set initially to False
+        self.screen_name = screen_name  # Store the screen name as an instance attribute
+        self.screen_number = screen_number
         self.url = url
         self.stream_thread = None  # Placeholder for StreamThread
         self.setup_ui()
 
+        print(self.screen_name)
+        print(self.screen_number)
+
     def to_dict(self):
         return {
             'stream_url': self.url,
+            'screen_name': self.screen_name,
+            'screen_number': self.screen_number,
             'active': self.active
         }
 
@@ -112,32 +119,93 @@ class VideoFrameWidget(QLabel):
         info_widget = QWidget(self)
         info_layout = QVBoxLayout(info_widget)
 
-    # Add a delete button to the widget
+
+        # Create a horizontal layout for the buttons
+        button_layout = QHBoxLayout()
+
+# Add the delete button
+        # Add the delete button
         delete_button = QToolButton(self)
         delete_button.setIcon(QIcon("bin.png")) 
+        delete_button.setText("Delete")  # Add text to the button
         delete_button.clicked.connect(self.confirm_delete)
         delete_button.setStyleSheet("color: white;")  # Set text color to white
-        info_layout.addWidget(delete_button)
+        delete_button.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)  # Display icon and text beside each other
+        button_layout.addWidget(delete_button)
 
-        # Add an edit button
-        self.edit_button = QToolButton(self)
-        self.edit_button.setIcon(QIcon("bin.png"))  # Provide appropriate icon
-        self.edit_button.clicked.connect(self.handle_edit_request)
-        self.edit_button.setStyleSheet("color: white;")  # Set text color to white
-        info_layout.addWidget(self.edit_button)
+# Add the edit button
+        edit_button = QToolButton(self)
+        edit_button.setIcon(QIcon("edit.png"))  # Provide appropriate icon
+        edit_button.setText("Edit")  # Add text to the button
+        edit_button.clicked.connect(self.handle_edit_request)
+        edit_button.setStyleSheet("color: white;")  # Set text color to white
+        edit_button.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)  # Display icon and text beside each other
+        button_layout.addWidget(edit_button)
+
+        # Add the fullscreen button
+        fullscreen_button = QToolButton(self)
+        fullscreen_button.setIcon(QIcon("fullscreen.png"))  # Provide appropriate icon
+        fullscreen_button.setText("Fullscreen")  # Add text to the button
+        fullscreen_button.clicked.connect(self.toggle_fullscreen)
+        fullscreen_button.setStyleSheet("color: white;")  # Set text color to white
+        fullscreen_button.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)  # Display icon and text beside each other
+        button_layout.addWidget(fullscreen_button)
+
+# Add the button layout to the info layout
+        info_layout.addLayout(button_layout)
 
     # Button to toggle stream on/off
-        self.stream_button = QPushButton("Toggle Stream", info_widget)
+        self.stream_button = QPushButton("Start Stream", info_widget)
         self.stream_button.clicked.connect(self.toggle_stream)
         self.stream_button.setStyleSheet("color: white;")  # Set text color to white
         info_layout.addWidget(self.stream_button)
 
-    # Add labels and button to the widget's layout
-        self.size_label = QLabel(f"Size: {self.width()} x {self.height()}", info_widget)
+        # Create a horizontal layout for the screen details
+        screen_layout = QHBoxLayout()
+
+# Add the monitor icon
+        
+
+# Add the screen name label
+        screen_name_label = QLabel(f" {self.screen_name}", info_widget)
+        screen_name_label.setStyleSheet("color: white;")  # Set text color to white
+        screen_layout.addWidget(screen_name_label)
+
+    #     monitor_label = QLabel(self)
+    #     monitor_label.setPixmap(QPixmap("monitor_icon.png")) 
+    #    # Set the monitor icon
+    #     screen_layout.addWidget(monitor_label)
+
+        monitor_label = QToolButton(self)
+        monitor_label.setIcon(QIcon("monitor_icon.png"))  # Provide appropriate icon
+        monitor_label.setText(f" {self.screen_number}")  # Add text to the button
+        # monitor_label.clicked.connect(self.handle_edit_request)
+        monitor_label.setStyleSheet("color: white;")  # Set text color to white
+        monitor_label.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+
+          # Display icon and text beside each other
+        screen_layout.addWidget(monitor_label)
+
+# Add the screen number label
+        # screen_number_label = QLabel(f" {self.screen_number}", info_widget)
+        # screen_number_label.setStyleSheet("color: white;")  # Set text color to white
+        # screen_layout.addWidget(screen_number_label)
+
+# Add the size label
+        self.size_label = QLabel(f" {self.width()} : {self.height()}", info_widget)
         self.size_label.setStyleSheet("color: white;")  # Set text color to white
-        self.url_label = QLabel(f"Stream URL: {self.url}", info_widget)
-        self.url_label.setStyleSheet("color: white;")  # Set text color to white
-        info_layout.addWidget(self.size_label)
+        screen_layout.addWidget(self.size_label)
+
+
+
+# Add the screen details layout to the info layout
+        info_layout.addLayout(screen_layout)   
+
+    # Add labels and button to the widget's layout
+        
+        self.url_label = QLabel(f"{self.url}", info_widget)
+        self.url_label.setStyleSheet("color: #4F94CD;")  # Set text color to white
+        # info_layout.addWidget(self.size_label)
         info_layout.addWidget(self.url_label)
         info_layout.addStretch()
 
@@ -146,6 +214,12 @@ class VideoFrameWidget(QLabel):
 
     # Add the splitter to the main layout
         main_layout.addWidget(splitter)
+
+    def toggle_fullscreen(self):
+        if self.isFullScreen():
+            self.showNormal()  # Exit fullscreen mode
+        else:
+            self.showFullScreen()
 
     def toggle_stream(self):
         # Implement the logic to start/stop the stream based on the button click
@@ -167,7 +241,7 @@ class VideoFrameWidget(QLabel):
 
     def set_active(self, active):
         self.active = active
-        self.setStyleSheet("border: 2px solid green;" if active else "")
+        self.setStyleSheet("border: 2px solid;" if active else "")
 
     def start_stream(self):
         # TODO: Implement logic to start streaming from the URL and update the QLabel
@@ -271,28 +345,6 @@ class EditDialog(QDialog):
         return self.url_input.text()
 
 
-class UploadScreenPopup(QDialog):
-    def __init__(self, parent=None):
-        super(UploadScreenPopup, self).__init__(parent)
-        self.setWindowTitle("Upload to Screen")
-        self.setGeometry(300, 300, 800, 600)
-
-        self.init_ui()
-
-    def init_ui(self):
-        label = QLabel("Select file to upload:")
-        upload_button = QPushButton("Upload", self)
-        upload_button.clicked.connect(self.upload_file)
-
-        layout = QVBoxLayout(self)
-        layout.addWidget(label)
-        layout.addWidget(upload_button)
-
-    def upload_file(self):
-        file_dialog = QFileDialog()
-        file_path, _ = file_dialog.getOpenFileName(self, 'Select File to Upload', '', 'All Files (*)')
-        print(f"File selected for upload: {file_path}")
-        self.accept()
 
 
 # Add the FullscreenOptionsPopup class
@@ -350,7 +402,12 @@ class AddStreamDialog(QDialog):
         form_layout.addRow(label_url, self.url_input)
 
         # Add additional fields
-        form_layout.addRow("Screen No.", QLineEdit(self))
+        self.screen_name_input = QLineEdit(self)
+        self.screen_number_input = QLineEdit(self)
+        form_layout.addRow("Screen Name:", self.screen_name_input)
+        form_layout.addRow("Screen Number:", self.screen_number_input)
+
+        # Add additional fields
         form_layout.addRow("Id", QLineEdit(self))
         form_layout.addRow("Psw", QLineEdit(self))
         form_layout.addRow("Place", QLineEdit(self))
@@ -379,7 +436,92 @@ class AddStreamDialog(QDialog):
 
     def get_stream_url(self):
         return self.url_input.text()
+    
+    def get_screen_name(self):
+        return self.screen_name_input.text()
 
+    def get_screen_number(self):
+        return self.screen_number_input.text()
+
+
+class UploadVideoDialog(QDialog):
+    def __init__(self, parent=None):
+        super(UploadVideoDialog, self).__init__(parent)
+        self.setWindowTitle("Upload Video")
+        self.setGeometry(100, 100, 1000, 700)
+        self.init_ui()
+
+    
+    def init_ui(self):
+        layout = QGridLayout(self)
+
+    # Set background color and text color
+        palette = QPalette()
+        palette.setColor(QPalette.Window, QColor('#28282B'))
+        palette.setColor(QPalette.WindowText, QColor(255, 255, 255))
+        self.setPalette(palette)
+
+    # Add header label
+        header_label = QLabel("Upload MP4 to Remote Client", self)
+        header_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(header_label, 0, 0, 1, 2)
+
+    # Add IP/URL field
+        ip_label = QLabel("Enter IP/URL of Remote Client:", self)
+        self.ip_input = QLineEdit(self)
+        layout.addWidget(ip_label, 1, 0)
+        layout.addWidget(self.ip_input, 1, 1)
+
+    # Add file selection button
+        self.file_button = QPushButton("Choose MP4 File", self)
+        self.file_button.clicked.connect(self.choose_file)
+        self.file_button.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
+        layout.addWidget(self.file_button, 2, 0, 1, 2)
+
+    # Add upload button
+        upload_button = QPushButton("Upload MP4", self)
+        upload_button.clicked.connect(self.upload_mp4)
+        upload_button.setStyleSheet("background-color: #4F94CD; color: white;")
+        upload_button.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
+        layout.addWidget(upload_button, 3, 0, 1, 2)
+
+    # Set column stretch to make the input field stretch horizontally
+        layout.setColumnStretch(1, 1)
+
+    # Set layout alignment
+        layout.setAlignment(Qt.AlignCenter)
+
+    def choose_file(self):
+        options = QFileDialog.Options()
+        options |= QFileDialog.DontUseNativeDialog
+        file_name, _ = QFileDialog.getOpenFileName(self, "Choose MP4 File", "", "MP4 Files (*.mp4)", options=options)
+        if file_name:
+            self.file_button.setText(file_name)
+
+   
+    def upload_mp4(self):
+        mp4_path = self.file_button.text().strip()  # Get the selected file path from the button text
+        ip_url = self.ip_input.text().strip()
+
+        if not mp4_path or not ip_url:
+            QMessageBox.warning(self, "Warning", "Please enter the IP/URL and choose an MP4 file.")
+            return
+
+        print("Upload button clicked")
+        try:
+            with open(mp4_path, 'rb') as file:
+                files = {'file': file}
+                response = requests.post(f'http://{ip_url}/upload_mp4', files=files)
+                response_data = response.json()
+                print(response_data)
+
+                if response_data.get('status') == 'success':
+                    QMessageBox.information(self, "Success", "MP4 file uploaded successfully.")
+                    self.accept()  # Close the dialog window
+                else:
+                    QMessageBox.warning(self, "Error", "Failed to upload MP4 file. Please try again.")
+        except Exception as e:
+            print(f"Error uploading MP4 file: {e}")
 
 class VideoUploaderApp(QMainWindow):
     def __init__(self):
@@ -393,7 +535,7 @@ class VideoUploaderApp(QMainWindow):
         self.setGeometry(100, 100, 1366, 768)
 
         self.header = QFrame(self)
-        self.header.setFixedHeight(90)
+        self.header.setFixedHeight(100)
         self.header_layout = QVBoxLayout(self.header)
         self.header.setStyleSheet("background-color: #28282B;")
         self.main_layout.addWidget(self.header)
@@ -407,6 +549,22 @@ class VideoUploaderApp(QMainWindow):
         self.header_layout.addWidget(self.logo_label)
 
         self.header_layout.addStretch()
+
+        # Add the header label below the logo label in the header layout
+        self.header_label = QLabel("Main", self.header)
+        # self.header_label.setFixedWidth(180)
+        # self.header_label.setStyleSheet("color: #4F94CD; font-size: 20px;")
+        self.header_label.setStyleSheet("background-color: #4F94CD; color: white; font-size: 30px; border: 2px solid #4F94CD; border-radius: 5px;")
+
+        self.header_label.setAlignment(Qt.AlignCenter)
+        # self.header_layout.setAlignment(Qt.AlignHCenter)
+
+        self.header_layout.addWidget(self.header_label)
+
+       
+
+# Adjust the logo label alignment to center
+        # self.logo_label.setAlignment(Qt.AlignCenter)
 
         self.left_panel = QFrame(self)
         self.left_panel.setStyleSheet("background-color: #28282B;")
@@ -494,16 +652,19 @@ class VideoUploaderApp(QMainWindow):
         self.video_frame_grid_layout.setAlignment(Qt.AlignTop)
         self.video_frame_grid_layout.setVerticalSpacing(50)
 
-        self.header_label = QLabel("Main", self.right_panel)
-        self.header_label.setStyleSheet("color: #4F94CD; font-size: 20px;")
-        self.header_label.setAlignment(Qt.AlignCenter)
-        self.video_frame_grid_layout.addWidget(self.header_label, 0, 0, 1, 3) 
+        # self.header_label = QLabel("Main", self.right_panel)
+        # self.header_label.setStyleSheet("color: #4F94CD; font-size: 20px;")
+        # self.header_label.setAlignment(Qt.AlignCenter)
+
+        # # Get the number of columns in the right panel's grid layout
+        # num_columns = self.video_frame_grid_layout.columnCount()
+        # self.video_frame_grid_layout.addWidget(self.header_label, 0, 0, 1, num_columns)
 
 
         self.footer = QLabel("© 2024 SPONSOR SALES", self)
         self.footer.setAlignment(Qt.AlignCenter)
         self.footer.setFixedHeight(20)
-        self.footer.setStyleSheet("background-color:black")
+        self.footer.setStyleSheet("background-color:black; color: #e5b73b; font-size: 20px;")
         self.main_layout.addWidget(self.footer)
 
         self.timer = QTimer(self)
@@ -512,71 +673,59 @@ class VideoUploaderApp(QMainWindow):
         # Load previously saved video frames
         self.load_video_frames()
 
-
-    
-
-    # def save_video_frames(self):
-    #     video_frame_data = [frame.to_dict() for frame in self.video_frames]
-    #     with open('video_frames.json', 'wb') as file:
-    #         # pickle.dump(video_frame_data, file)
-    #         json.dump(video_frame_data, file)
-           
-
-
-    # def load_video_frames(self):
-    #     try:
-    #         with open('video_frames.json', 'rb') as file:
-    #             video_frame_data = json.load(file)
-    #             self.video_frames = [VideoFrameWidget(frame['stream_url'], self.right_panel) for frame in video_frame_data]
-    #             # for frame in self.video_frames:
-    #             #     # self.video_frame_layout.addWidget(frame)
-    #             #     row, col = divmod(len(self.video_frames) - 2, 2)  # Adjust the number of columns as needed
-    #             #     self.video_frame_layout.addWidget(frame, row, col)
-    #             #     print(f"Loaded video frame: {frame.to_dict()}")
-
-    #             for idx, frame in enumerate(self.video_frames):
-    #                 row, col = divmod(idx, 3)  # Adjust the number of columns as needed
-    #                 self.video_frame_layout.addWidget(frame, row, col)
-    #                 print(f"Loaded video frame: {frame.to_dict()}")
-    #     except FileNotFoundError:
-    #         self.video_frames = []
-        
+     
     def save_video_frames(self):
         video_frame_data = [frame.to_dict() for frame in self.video_frames]
         with open('video_frames.json', 'w') as file:  # Open file in text mode ('w')
             json.dump(video_frame_data, file)
 
     def load_video_frames(self):
-        file_path = Path('video_frames.json')  # Define the file path
-        if file_path.exists():  # Check if the file exists
+        file_path = Path('video_frames.json')
+        if file_path.exists():
             try:
                 with open(file_path, 'r') as file:
                     video_frame_data = json.load(file)
-                    self.video_frames = [VideoFrameWidget(frame['stream_url'], self.right_panel) for frame in video_frame_data]
+                    for frame_data in video_frame_data:
+                        stream_url = frame_data['stream_url']
+                        screen_name = frame_data['screen_name']
+                        screen_number = frame_data['screen_number']
+                        video_frame = VideoFrameWidget(stream_url, screen_name, screen_number, self.right_panel)
+                        self.video_frames.append(video_frame)
 
                     # Add loaded video frames to layout
-                    for idx, frame in enumerate(self.video_frames):
-                        row, col = divmod(idx, 3)  # Adjust the number of columns as needed
-                        self.video_frame_layout.addWidget(frame, row, col)
-                        print(f"Loaded video frame: {frame.to_dict()}")
+                        row, col = divmod(len(self.video_frames) - 1, 2)
+                        self.video_frame_layout.addWidget(video_frame, row, col)
+                        print(f"Loaded video frame: {frame_data}")
             except json.JSONDecodeError:
                 QMessageBox.critical(self, "Error", "Invalid JSON data in the file.")
-                self.video_frames = []  # Reset video frames list
+                self.video_frames = []
         else:
-            self.video_frames = []  # File doesn't exist, initialize video frames list
+            self.video_frames = []
 
+    # def add_stream(self):
+    #     add_stream_dialog = AddStreamDialog(self)
+    #     result = add_stream_dialog.exec_()
+    #     if result == QDialog.Accepted:
+    #         stream_url = add_stream_dialog.get_stream_url()
+    #         self.add_video_frame(stream_url)
 
     def add_stream(self):
         add_stream_dialog = AddStreamDialog(self)
         result = add_stream_dialog.exec_()
         if result == QDialog.Accepted:
             stream_url = add_stream_dialog.get_stream_url()
-            self.add_video_frame(stream_url)
+            screen_name = add_stream_dialog.get_screen_name()  # Example method to get screen name
+            screen_number = add_stream_dialog.get_screen_number()  # Example method to get screen number
+            self.add_video_frame(stream_url, screen_name, screen_number)
 
-    def add_video_frame(self, stream_url):
-        # video_frame = VideoFrameWidget(stream_url, self.right_panel)
-        # Inside VideoUploaderApp class where VideoFrameWidget is created and added
-        video_frame = VideoFrameWidget(stream_url, parent=self.right_panel)
+
+    def add_video_frame(self, stream_url, screen_name, screen_number):
+        # Create a new instance of VideoFrameWidget with screen name and number
+        video_frame = VideoFrameWidget(stream_url, parent=self.right_panel,
+                                       screen_name=screen_name, screen_number=screen_number)
+        
+        
+
 
         video_frame.deleteRequested.connect(self.delete_video_frame)
         self.video_frames.append(video_frame)
@@ -597,15 +746,7 @@ class VideoUploaderApp(QMainWindow):
     # Adjust the splitter sizes to make sure the right panel gets resized properly
         self.splitter.setSizes([int(self.width() * 0.3), int(self.width() * 0.7)])
 
-    # def delete_video_frame(self, video_frame):
-    # # Remove the video frame from the list and layout
-    #     self.video_frames.remove(video_frame)
-    #     self.video_frame_grid_layout.removeWidget(video_frame)
-    #     video_frame.setParent(None)
-    #     video_frame.deleteLater()
-
     
-
     def delete_video_frame(self, video_frame):
         if video_frame in self.video_frames:
             self.video_frames.remove(video_frame)
@@ -616,7 +757,7 @@ class VideoUploaderApp(QMainWindow):
 
 
     def setup_upload_screen(self):
-        upload_popup = UploadScreenPopup(self)
+        upload_popup = UploadVideoDialog(self)
         result = upload_popup.exec_()
         if result == QDialog.Accepted:
             print("Upload to Screen popup accepted")

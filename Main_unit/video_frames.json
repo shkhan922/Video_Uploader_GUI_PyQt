@@ -1,1 +1,1 @@
-[{"stream_url": "http://192.168.1.2:5000/video_feed", "active": true}]
+[{"stream_url": "http://192.168.1.3:5000/video_feed", "screen_name": "Test_Screen_2", "screen_number": "2", "active": true}, {"stream_url": "http://192.168.1.2:5000/video_feed", "screen_name": "Screen_3", "screen_number": "3", "active": true}, {"stream_url": "http://192.168.1.2:5000/video_feed", "screen_name": "Screen_4", "screen_number": "4", "active": true}]

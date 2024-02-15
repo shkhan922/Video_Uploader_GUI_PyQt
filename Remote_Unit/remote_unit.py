@@ -73,6 +73,22 @@ def enable_preview(stream_url):
     # For now, simply enable the preview
     preview_enabled = True
 
+# def generate_stream():
+#     latest_video_path = get_latest_uploaded_video()
+#     if latest_video_path:
+#         cap = cv2.VideoCapture(latest_video_path)
+#         while cap.isOpened():
+#             success, frame = cap.read()
+#             if not success:
+#                 # Restart video playback when it reaches the end
+#                 cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+#                 continue
+#             ret, jpeg = cv2.imencode('.jpg', frame)
+#             frame_bytes = jpeg.tobytes()
+#             yield (b'--frame\r\n'
+#                    b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n\r\n')
+#         cap.release()
+
 def generate_stream():
     latest_video_path = get_latest_uploaded_video()
     if latest_video_path:
@@ -80,14 +96,13 @@ def generate_stream():
         while cap.isOpened():
             success, frame = cap.read()
             if not success:
-                # Restart video playback when it reaches the end
-                cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-                continue
+                # Release the video capture object and exit the loop when the end of the video is reached
+                cap.release()
+                break
             ret, jpeg = cv2.imencode('.jpg', frame)
             frame_bytes = jpeg.tobytes()
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n\r\n')
-        cap.release()
 
 def get_latest_uploaded_video():
     video_list = get_video_list()
