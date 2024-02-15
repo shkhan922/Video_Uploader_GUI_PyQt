@@ -4,7 +4,7 @@ from PyQt5.QtGui import QPixmap, QImage, QIcon
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QLabel, QVBoxLayout, QPushButton,
     QWidget, QFrame, QSplitter, QFileDialog, QSpacerItem, QButtonGroup,
-    QDialog,QHBoxLayout,QHeaderView,QSizePolicy,QLineEdit, QSpinBox,QGridLayout,QToolButton
+    QDialog,QHBoxLayout,QHeaderView,QSizePolicy,QLineEdit, QSpinBox,QGridLayout,QToolButton,QMessageBox
 )
 from PyQt5.QtGui import QPixmap, QIcon
 from PyQt5.QtWidgets import   QFormLayout, QDateEdit, QSpinBox
@@ -15,9 +15,52 @@ import requests
 import cv2
 import numpy as np
 import pickle
+import json
+from pathlib import Path  
+
+# class StreamThread(QThread):
+#     update_frame_signal = pyqtSignal(QImage)
+
+#     def __init__(self, url, update_interval=100):
+#         super().__init__()
+#         self.url = url
+#         self.update_interval = update_interval
+#         self.stopped = False
+
+#     def stop(self):
+#         self.stopped = True
+
+#     def run(self):
+#         with requests.get(self.url, stream=True) as r:
+#             bytes_data = bytes()
+#             while not self.stopped:
+#                 chunk = r.raw.read(1024)
+#                 if not chunk:
+#                     break
+#                 bytes_data += chunk
+#                 a = bytes_data.find(b'\xff\xd8')
+#                 b = bytes_data.find(b'\xff\xd9', a)
+#                 if a != -1 and b != -1:
+#                     jpg = bytes_data[a:b+2]
+#                     bytes_data = bytes_data[b+2:]
+#                     self.emit_frame(jpg)
+
+#     def emit_frame(self, jpg_data):
+#         try:
+#             frame = cv2.imdecode(np.frombuffer(jpg_data, np.uint8), cv2.IMREAD_COLOR)
+#             if frame is not None:
+#                 height, width, channel = frame.shape
+#                 bytesPerLine = 3 * width
+#                 qImg = QImage(frame.data, width, height, bytesPerLine, QImage.Format_RGB888).rgbSwapped()
+#                 self.update_frame_signal.emit(qImg)
+#         except Exception as e:
+#             print(f"Error processing frame: {e}")
+
+
 
 class StreamThread(QThread):
     update_frame_signal = pyqtSignal(QImage)
+    error_signal = pyqtSignal(str)
 
     def __init__(self, url, update_interval=100):
         super().__init__()
@@ -29,19 +72,22 @@ class StreamThread(QThread):
         self.stopped = True
 
     def run(self):
-        with requests.get(self.url, stream=True) as r:
-            bytes_data = bytes()
-            while not self.stopped:
-                chunk = r.raw.read(1024)
-                if not chunk:
-                    break
-                bytes_data += chunk
-                a = bytes_data.find(b'\xff\xd8')
-                b = bytes_data.find(b'\xff\xd9', a)
-                if a != -1 and b != -1:
-                    jpg = bytes_data[a:b+2]
-                    bytes_data = bytes_data[b+2:]
-                    self.emit_frame(jpg)
+        try:
+            with requests.get(self.url, stream=True) as r:
+                bytes_data = bytes()
+                while not self.stopped:
+                    chunk = r.raw.read(1024)
+                    if not chunk:
+                        break
+                    bytes_data += chunk
+                    a = bytes_data.find(b'\xff\xd8')
+                    b = bytes_data.find(b'\xff\xd9', a)
+                    if a != -1 and b != -1:
+                        jpg = bytes_data[a:b + 2]
+                        bytes_data = bytes_data[b + 2:]
+                        self.emit_frame(jpg)
+        except Exception as e:
+            self.error_signal.emit(str(e))
 
     def emit_frame(self, jpg_data):
         try:
@@ -65,117 +111,6 @@ class CustomHeaderView(QHeaderView):
                 text-align: center;
             }
         """)
-
-
-# class VideoFrameWidget(QLabel):
-
-#     deleteRequested = pyqtSignal(QWidget)
-#     streamStateChanged = pyqtSignal(bool, str)  # Signal for stream state change (on/off)
-
-#     def __init__(self, url, parent=None):
-#         super(VideoFrameWidget, self).__init__(parent)
-#         self.setFixedSize(400, 400)
-#         self.setAlignment(Qt.AlignCenter)
-#         self.active = False  # Set initially to False
-#         self.url = url
-#         self.size_label = QLabel(f"Size: {self.width()} x {self.height()}", self)  # Corrected
-#         self.url_label = QLabel(f"Stream URL: {self.url}", self)  # Corrected
-#         self.setup_ui()
-
-#     def to_dict(self):
-#         return {
-#             'stream_url': self.url,
-#             'active': self.active
-#         }
-
-#     def setup_ui(self):
-#     # Create a main layout for the VideoFrame
-#         main_layout = QVBoxLayout(self)
-#         main_layout.setAlignment(Qt.AlignBottom)
-
-#     # Create a widget to hold the static labels and button
-#         info_widget = QWidget(self)
-
-#     # Create info_layout here
-#         info_layout = QVBoxLayout(info_widget)
-
-#     # Add a delete button to the widget
-#         delete_button = QToolButton(self)
-#         delete_button.setIcon(QIcon("delete_icon.png"))  # Replace with the actual path to your delete icon
-#         delete_button.clicked.connect(self.handle_delete_request)
-
-#     # Add the delete button to the layout
-#         info_layout.addWidget(delete_button)
-
-#     # Button to toggle stream on/off
-#         self.stream_button = QPushButton("Toggle Stream", info_widget)
-#         self.stream_button.clicked.connect(self.toggle_stream)
-
-#     # Add labels and button to the widget's layout
-#         self.size_label = QLabel(f"Size: {self.width()} x {self.height()}", info_widget)
-#         self.url_label = QLabel(f"Stream URL: {self.url}", info_widget)
-#         info_layout.addWidget(self.size_label)
-#         info_layout.addWidget(self.url_label)
-#         info_layout.addWidget(self.stream_button)
-#         info_layout.addStretch()
-
-#     # # Indicator label for stream status
-#     #     self.status_indicator = QLabel("Stream Not Started", self)
-#     #     self.status_indicator.setAlignment(Qt.AlignCenter)
-#     #     self.status_indicator.setStyleSheet("background-color: #e0e0e0;")
-#     #     self.status_indicator.setGeometry(0, 0, self.width(), self.height())
-#     #     self.status_indicator.show()
-
-#     # Border styling
-#         self.setStyleSheet("border: 2px solid red;")
-
-#     # Add the info widget to the main layout
-#         main_layout.addWidget(info_widget)
-
-#     def toggle_stream(self):
-#     # Implement the logic to start/stop the stream based on the button click
-#         self.active = not self.active
-
-#     # Toggle button text
-#         self.stream_button.setText("Toggle Stream (On)" if self.active else "Toggle Stream (Off)")
-
-#     # Always show labels
-#         self.show_labels()
-
-#         if self.active:
-#         # Start stream
-#             self.streamStateChanged.emit(True, self.url)
-#             self.status_indicator.setText("Stream Started")
-#         else:
-#         # Stop stream
-#             self.streamStateChanged.emit(False, self.url)
-#             self.status_indicator.setText("Stream Stopped")
-
-#         self.set_active(self.active)  # Call set_active to update the appearance
-
-#     def show_labels(self):
-#         self.size_label.show()
-#         self.url_label.show()
-#         self.stream_button.show()
-
-
-#     def set_active(self, active):
-#         self.active = active
-#         self.setStyleSheet("border: 2px solid green;" if active else "")
-#         if active:
-#             self.hide_status_indicator()
-#         else:
-#             self.show_status_indicator()
-
-#     def show_status_indicator(self):
-#         self.status_indicator.show()
-
-#     def hide_status_indicator(self):
-#         self.status_indicator.hide()
-
-#     def handle_delete_request(self):
-#         # Emit the deleteRequested signal when the delete button is clicked
-#         self.deleteRequested.emit(self)
 
 
 class VideoFrameWidget(QLabel):
@@ -208,7 +143,7 @@ class VideoFrameWidget(QLabel):
     # Create a widget for streaming video (top panel)
         video_widget = QLabel(self)
         video_widget.setAlignment(Qt.AlignCenter)
-        video_widget.setStyleSheet("border: 2px solid blue; color: white;")  # Set text color to white
+        video_widget.setStyleSheet("border: 2px solid red; color: white;")  # Set text color to white
         splitter.addWidget(video_widget)
 
     # Create a widget for info labels and buttons (bottom panel)
@@ -217,7 +152,7 @@ class VideoFrameWidget(QLabel):
 
     # Add a delete button to the widget
         delete_button = QToolButton(self)
-        delete_button.setIcon(QIcon("bin.png"))  # Replace with the actual path to your delete icon
+        delete_button.setIcon(QIcon("bin.png")) 
         delete_button.clicked.connect(self.handle_delete_request)
         delete_button.setStyleSheet("color: white;")  # Set text color to white
         info_layout.addWidget(delete_button)
@@ -284,8 +219,35 @@ class VideoFrameWidget(QLabel):
         self.findChild(QLabel).setPixmap(QPixmap.fromImage(qImg))
 
     def handle_delete_request(self):
-        # Emit the deleteRequested signal when the delete button is clicked
+    # Emit the deleteRequested signal when the delete button is clicked
         self.deleteRequested.emit(self)
+
+    # Remove from UI
+        self.setParent(None)
+        self.deleteLater()
+
+    # Remove from video_frames list if it exists in the parent
+        parent = self.parent()
+        if parent and isinstance(parent, VideoUploaderApp):
+            if self in parent.video_frames:
+                parent.video_frames.remove(self)
+
+            # Update JSON file
+                parent.save_video_frames()
+            else:
+                print("Widget not found in video_frames list.")
+        else:
+            print("Parent widget not found or is not an instance of VideoUploaderApp.")
+
+    def handle_stream_error(self, error_msg):
+        # Handle errors when the stream is not available
+        self.active = False
+        self.stream_button.setText("Turn Stream (On)")  # Reset button text
+        self.set_active(False)  # Update appearance
+        self.update_video_frame(QImage())  # Clear video frame
+        self.stream_thread = None
+        QMessageBox.warning(self, "Stream Error", f"Error accessing stream: {error_msg}")
+
 
 class UploadScreenPopup(QDialog):
     def __init__(self, parent=None):
@@ -310,36 +272,6 @@ class UploadScreenPopup(QDialog):
         print(f"File selected for upload: {file_path}")
         self.accept()
 
-class SetupScreenPopup(QDialog):
-    def __init__(self, parent=None):
-        super(SetupScreenPopup, self).__init__(parent)
-        self.setWindowTitle("Setup New Screen")
-        self.setGeometry(300, 300, 800, 400)
-
-        self.init_ui()
-
-    def init_ui(self):
-        label = QLabel("Enter setup information:")
-        self.setup_input = QLineEdit(self)
-        submit_button = QPushButton("Submit", self)
-        submit_button.clicked.connect(self.submit_form)
-
-        layout = QVBoxLayout(self)
-        layout.addWidget(label)
-        layout.addWidget(self.setup_input)
-        layout.addWidget(submit_button)
-
-    def submit_form(self):
-        setup_info = self.setup_input.text()
-        print(f"Setup information submitted: {setup_info}")
-        self.accept()
-
-
-class RemoteScreen:
-    def __init__(self, name, url):
-        self.name = name
-        self.url = url
-        self.available = True  # Assume all screens are initially available
 
 # Add the FullscreenOptionsPopup class
 class FullscreenOptionsPopup(QDialog):
@@ -380,18 +312,6 @@ class AddStreamDialog(QDialog):
         self.setGeometry(100, 100, 1000, 600)
 
         self.init_ui()
-
-    # def init_ui(self):
-    #     label_url = QLabel("Enter Stream URL:", self)
-    #     self.url_input = QLineEdit(self)
-
-    #     add_button = QPushButton("Add Stream", self)
-    #     add_button.clicked.connect(self.accept)
-
-    #     layout = QVBoxLayout(self)
-    #     layout.addWidget(label_url)
-    #     layout.addWidget(self.url_input)
-    #     layout.addWidget(add_button)
 
     def init_ui(self):
         form_layout = QFormLayout(self)
@@ -569,28 +489,56 @@ class VideoUploaderApp(QMainWindow):
 
     
 
+    # def save_video_frames(self):
+    #     video_frame_data = [frame.to_dict() for frame in self.video_frames]
+    #     with open('video_frames.json', 'wb') as file:
+    #         # pickle.dump(video_frame_data, file)
+    #         json.dump(video_frame_data, file)
+           
+
+
+    # def load_video_frames(self):
+    #     try:
+    #         with open('video_frames.json', 'rb') as file:
+    #             video_frame_data = json.load(file)
+    #             self.video_frames = [VideoFrameWidget(frame['stream_url'], self.right_panel) for frame in video_frame_data]
+    #             # for frame in self.video_frames:
+    #             #     # self.video_frame_layout.addWidget(frame)
+    #             #     row, col = divmod(len(self.video_frames) - 2, 2)  # Adjust the number of columns as needed
+    #             #     self.video_frame_layout.addWidget(frame, row, col)
+    #             #     print(f"Loaded video frame: {frame.to_dict()}")
+
+    #             for idx, frame in enumerate(self.video_frames):
+    #                 row, col = divmod(idx, 3)  # Adjust the number of columns as needed
+    #                 self.video_frame_layout.addWidget(frame, row, col)
+    #                 print(f"Loaded video frame: {frame.to_dict()}")
+    #     except FileNotFoundError:
+    #         self.video_frames = []
+        
     def save_video_frames(self):
         video_frame_data = [frame.to_dict() for frame in self.video_frames]
-        with open('video_frames.pkl', 'wb') as file:
-            pickle.dump(video_frame_data, file)
+        with open('video_frames.json', 'w') as file:  # Open file in text mode ('w')
+            json.dump(video_frame_data, file)
 
     def load_video_frames(self):
-        try:
-            with open('video_frames.pkl', 'rb') as file:
-                video_frame_data = pickle.load(file)
-                self.video_frames = [VideoFrameWidget(frame['stream_url'], self.right_panel) for frame in video_frame_data]
-                # for frame in self.video_frames:
-                #     # self.video_frame_layout.addWidget(frame)
-                #     row, col = divmod(len(self.video_frames) - 2, 2)  # Adjust the number of columns as needed
-                #     self.video_frame_layout.addWidget(frame, row, col)
-                #     print(f"Loaded video frame: {frame.to_dict()}")
+        file_path = Path('video_frames.json')  # Define the file path
+        if file_path.exists():  # Check if the file exists
+            try:
+                with open(file_path, 'r') as file:
+                    video_frame_data = json.load(file)
+                    self.video_frames = [VideoFrameWidget(frame['stream_url'], self.right_panel) for frame in video_frame_data]
 
-                for idx, frame in enumerate(self.video_frames):
-                    row, col = divmod(idx, 3)  # Adjust the number of columns as needed
-                    self.video_frame_layout.addWidget(frame, row, col)
-                    print(f"Loaded video frame: {frame.to_dict()}")
-        except FileNotFoundError:
-            self.video_frames = []
+                    # Add loaded video frames to layout
+                    for idx, frame in enumerate(self.video_frames):
+                        row, col = divmod(idx, 3)  # Adjust the number of columns as needed
+                        self.video_frame_layout.addWidget(frame, row, col)
+                        print(f"Loaded video frame: {frame.to_dict()}")
+            except json.JSONDecodeError:
+                QMessageBox.critical(self, "Error", "Invalid JSON data in the file.")
+                self.video_frames = []  # Reset video frames list
+        else:
+            self.video_frames = []  # File doesn't exist, initialize video frames list
+
 
     def add_stream(self):
         add_stream_dialog = AddStreamDialog(self)
@@ -636,26 +584,6 @@ class VideoUploaderApp(QMainWindow):
         else:
             print("Upload to Screen popup canceled")
  
-
-    # def setup_setup_screen(self):
-    #     upload_popup = SetupScreenPopup(self)
-    #     result = upload_popup.exec_()
-    #     if result == QDialog.Accepted:
-    #         # Get the stream URL from the upload form (you may need to modify this based on your form implementation)
-    #         print(result)
-    #         stream_url = "http://example.com/stream"  # Replace this with the actual URL from your form
-
-    #         # Create a new video frame and start streaming for the uploaded stream URL
-    #         video_frame = VideoFrame(self.right_panel)
-    #         self.video_frames.append(video_frame)
-    #         self.video_frame_layout.addWidget(video_frame)
-
-    #         stream_thread = StreamThread(stream_url)
-    #         stream_thread.update_frame_signal.connect(lambda image, frame=video_frame: self.update_video_feed(image, frame))
-    #         stream_thread.start()
-
-    #     else:
-    #         print("Setup New Screen popup canceled")
 
     def closeEvent(self, event):
         # Stop the stream threads before closing the application
