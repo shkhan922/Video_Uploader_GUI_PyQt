@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import (
     QDialog,QHBoxLayout,QHeaderView,QSizePolicy,QLineEdit, QSpinBox,QGridLayout,QToolButton,QMessageBox
 )
 from PyQt5.QtGui import QPixmap, QIcon
-from PyQt5.QtWidgets import   QFormLayout, QDateEdit, QSpinBox
+from PyQt5.QtWidgets import   QFormLayout, QDateEdit, QSpinBox,QDialogButtonBox
 from PyQt5.QtGui import QPalette, QColor
 from base64 import b64decode
 from PyQt5.QtCore import pyqtSlot
@@ -17,44 +17,6 @@ import numpy as np
 import pickle
 import json
 from pathlib import Path  
-
-# class StreamThread(QThread):
-#     update_frame_signal = pyqtSignal(QImage)
-
-#     def __init__(self, url, update_interval=100):
-#         super().__init__()
-#         self.url = url
-#         self.update_interval = update_interval
-#         self.stopped = False
-
-#     def stop(self):
-#         self.stopped = True
-
-#     def run(self):
-#         with requests.get(self.url, stream=True) as r:
-#             bytes_data = bytes()
-#             while not self.stopped:
-#                 chunk = r.raw.read(1024)
-#                 if not chunk:
-#                     break
-#                 bytes_data += chunk
-#                 a = bytes_data.find(b'\xff\xd8')
-#                 b = bytes_data.find(b'\xff\xd9', a)
-#                 if a != -1 and b != -1:
-#                     jpg = bytes_data[a:b+2]
-#                     bytes_data = bytes_data[b+2:]
-#                     self.emit_frame(jpg)
-
-#     def emit_frame(self, jpg_data):
-#         try:
-#             frame = cv2.imdecode(np.frombuffer(jpg_data, np.uint8), cv2.IMREAD_COLOR)
-#             if frame is not None:
-#                 height, width, channel = frame.shape
-#                 bytesPerLine = 3 * width
-#                 qImg = QImage(frame.data, width, height, bytesPerLine, QImage.Format_RGB888).rgbSwapped()
-#                 self.update_frame_signal.emit(qImg)
-#         except Exception as e:
-#             print(f"Error processing frame: {e}")
 
 
 
@@ -153,9 +115,16 @@ class VideoFrameWidget(QLabel):
     # Add a delete button to the widget
         delete_button = QToolButton(self)
         delete_button.setIcon(QIcon("bin.png")) 
-        delete_button.clicked.connect(self.handle_delete_request)
+        delete_button.clicked.connect(self.confirm_delete)
         delete_button.setStyleSheet("color: white;")  # Set text color to white
         info_layout.addWidget(delete_button)
+
+        # Add an edit button
+        self.edit_button = QToolButton(self)
+        self.edit_button.setIcon(QIcon("bin.png"))  # Provide appropriate icon
+        self.edit_button.clicked.connect(self.handle_edit_request)
+        self.edit_button.setStyleSheet("color: white;")  # Set text color to white
+        info_layout.addWidget(self.edit_button)
 
     # Button to toggle stream on/off
         self.stream_button = QPushButton("Toggle Stream", info_widget)
@@ -219,25 +188,50 @@ class VideoFrameWidget(QLabel):
         self.findChild(QLabel).setPixmap(QPixmap.fromImage(qImg))
 
     def handle_delete_request(self):
-    # Emit the deleteRequested signal when the delete button is clicked
-        self.deleteRequested.emit(self)
+    # Get the parent widget
+        current_parent = self.parent()
+        app_instance = None
+
+    # Traverse the parent hierarchy until a VideoUploaderApp instance is found
+        while current_parent:
+            if isinstance(current_parent, VideoUploaderApp):
+                app_instance = current_parent
+                break
+            current_parent = current_parent.parent()
+
+    # Check if the VideoUploaderApp instance is found
+        if app_instance:
+        # Remove the widget from the parent's video_frames list
+            if self in app_instance.video_frames:
+                app_instance.video_frames.remove(self)
+            # Update JSON file
+                app_instance.save_video_frames()
+            else:
+                print("Widget not found in video_frames list.")
+        else:
+            print("Parent widget not found or is not an instance of VideoUploaderApp.")
 
     # Remove from UI
         self.setParent(None)
         self.deleteLater()
 
-    # Remove from video_frames list if it exists in the parent
-        parent = self.parent()
-        if parent and isinstance(parent, VideoUploaderApp):
-            if self in parent.video_frames:
-                parent.video_frames.remove(self)
 
-            # Update JSON file
-                parent.save_video_frames()
-            else:
-                print("Widget not found in video_frames list.")
-        else:
-            print("Parent widget not found or is not an instance of VideoUploaderApp.")
+    def confirm_delete(self):
+        reply = QMessageBox.question(self, 'Delete Confirmation', 'Are you sure you want to delete this stream?',
+                                 QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        msg_box = QMessageBox()
+        msg_box.setStyleSheet("QMessageBox { color: white; }")
+        if reply == QMessageBox.Yes:
+            self.handle_delete_request()
+
+    def handle_edit_request(self):
+        # Open a dialog to edit the URL and other options
+        edit_dialog = EditDialog(self.url, parent=self)
+        if edit_dialog.exec_() == QDialog.Accepted:
+            # Update the URL and other options
+            self.url = edit_dialog.get_url()
+            # Update the label or any other UI components as needed
+            self.url_label.setText(f"Stream URL: {self.url}")
 
     def handle_stream_error(self, error_msg):
         # Handle errors when the stream is not available
@@ -247,6 +241,34 @@ class VideoFrameWidget(QLabel):
         self.update_video_frame(QImage())  # Clear video frame
         self.stream_thread = None
         QMessageBox.warning(self, "Stream Error", f"Error accessing stream: {error_msg}")
+
+class EditDialog(QDialog):
+    def __init__(self, initial_url, parent=None):
+        super(EditDialog, self).__init__(parent)
+        self.setWindowTitle("Edit Stream Details")
+        self.setGeometry(300, 300, 400, 200)
+
+        self.init_ui(initial_url)
+
+    def init_ui(self, initial_url):
+        layout = QVBoxLayout(self)
+
+        self.url_label = QLabel("Stream URL:", self)
+        self.url_input = QLineEdit(initial_url, self)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, Qt.Horizontal, self)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+
+        layout.addWidget(self.url_label)
+        layout.addWidget(self.url_input)
+        layout.addWidget(buttons)
+
+        # Set text color to white
+        self.setStyleSheet("color: white;")
+
+    def get_url(self):
+        return self.url_input.text()
 
 
 class UploadScreenPopup(QDialog):
@@ -377,6 +399,7 @@ class VideoUploaderApp(QMainWindow):
         self.main_layout.addWidget(self.header)
 
         
+        
 
         logo_pixmap = QPixmap("./logo.png").scaled(350, 130, Qt.KeepAspectRatio, Qt.SmoothTransformation)
         self.logo_label = QLabel(self.header)
@@ -463,8 +486,6 @@ class VideoUploaderApp(QMainWindow):
        
         self.video_frames = [] 
         self.video_frame_layout = QGridLayout(self.right_panel)
-        # self.video_frame_layout.setAlignment(Qt.AlignTop)
-        # self.video_frame_layout.setVerticalSpacing(10) 
         
 
         # Initialize the video frame grid layout
@@ -472,6 +493,11 @@ class VideoUploaderApp(QMainWindow):
         self.right_panel.setLayout(self.video_frame_grid_layout)
         self.video_frame_grid_layout.setAlignment(Qt.AlignTop)
         self.video_frame_grid_layout.setVerticalSpacing(50)
+
+        self.header_label = QLabel("Main", self.right_panel)
+        self.header_label.setStyleSheet("color: #4F94CD; font-size: 20px;")
+        self.header_label.setAlignment(Qt.AlignCenter)
+        self.video_frame_grid_layout.addWidget(self.header_label, 0, 0, 1, 3) 
 
 
         self.footer = QLabel("© 2024 SPONSOR SALES", self)
@@ -548,7 +574,10 @@ class VideoUploaderApp(QMainWindow):
             self.add_video_frame(stream_url)
 
     def add_video_frame(self, stream_url):
-        video_frame = VideoFrameWidget(stream_url, self.right_panel)
+        # video_frame = VideoFrameWidget(stream_url, self.right_panel)
+        # Inside VideoUploaderApp class where VideoFrameWidget is created and added
+        video_frame = VideoFrameWidget(stream_url, parent=self.right_panel)
+
         video_frame.deleteRequested.connect(self.delete_video_frame)
         self.video_frames.append(video_frame)
 
@@ -568,12 +597,22 @@ class VideoUploaderApp(QMainWindow):
     # Adjust the splitter sizes to make sure the right panel gets resized properly
         self.splitter.setSizes([int(self.width() * 0.3), int(self.width() * 0.7)])
 
+    # def delete_video_frame(self, video_frame):
+    # # Remove the video frame from the list and layout
+    #     self.video_frames.remove(video_frame)
+    #     self.video_frame_grid_layout.removeWidget(video_frame)
+    #     video_frame.setParent(None)
+    #     video_frame.deleteLater()
+
+    
+
     def delete_video_frame(self, video_frame):
-    # Remove the video frame from the list and layout
-        self.video_frames.remove(video_frame)
-        self.video_frame_grid_layout.removeWidget(video_frame)
-        video_frame.setParent(None)
-        video_frame.deleteLater()
+        if video_frame in self.video_frames:
+            self.video_frames.remove(video_frame)
+            self.video_frame_layout.removeWidget(video_frame)
+            video_frame.setParent(None)
+            video_frame.deleteLater()
+            self.save_video_frames()
 
 
     def setup_upload_screen(self):

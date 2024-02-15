@@ -1,1 +1,1 @@
-[{"stream_url": "http://192.168.1.22:5000/video_feed", "active": false}, {"stream_url": "http://192.168.1.22:5000/video_feed", "active": false}, {"stream_url": "http://192.168.1.22:5000/video_feed", "active": false}, {"stream_url": "http://192.168.1.22:5000/video_feed", "active": false}, {"stream_url": "http://192.168.1.22:5000/video_feed", "active": false}, {"stream_url": "http://192.168.1.4:5000/video_feed", "active": true}]
+[{"stream_url": "http://192.168.1.2:5000/video_feed", "active": true}]
